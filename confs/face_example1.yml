@@ -4,8 +4,8 @@ data:
     paper_face_mask:  #conf_base.py/ dsName
       mask_loader: true
       # # The following is consistent with image_datasets.py/ load_data_inpa()
-      gt_path: ./data/datasets/some_my_pic/
-      mask_path: ./data/datasets/gt_keep_masks/mytry
+      gt_path: ./data/datasets/mypic
+      mask_path: ./data/datasets/mymask
       batch_size: 1
       image_size: 256 # Resized image(your desired)
 #      class_cond: false
@@ -18,10 +18,10 @@ data:
       drop_last: false
       offset: 0
       paths: # # # # # # # # # # # # # #
-        srs: ./log1/inpainted
-        lrs: ./log1/gt_masked
-#        gts: ./log1/gt
-#        gt_keep_masks: ./log1/gt_keep_mask
+        srs: ./log/inpainted
+        lrs: ./log/gt_masked
+#        gts: ./log/gt
+#        gt_keep_masks: ./log/gt_keep_mask
 
 
 
@@ -33,15 +33,14 @@ model_path: ./data/pretrained/celeba256_250000.pt
 
 
 # # # # gaussian_diffusion.py/ get_named_beta_schedule()
-diffusion_steps: 2000 #
+diffusion_steps: 1000 #
 noise_schedule: linear #
 
-timestep_respacing: 'ddim50' # respace.py
+timestep_respacing: '50' # respace.py
 schedule_jump_params:
   t_T: 50 # # # # scheduler.py # # # #
-  n_sample: 2 #
   jump_length: 10
-  jump_n_sample: 12
+  jump_n_sample: 10
 
 
 use_ddim: false # # # # # # # # # # # # # # #
