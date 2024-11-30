@@ -227,6 +227,9 @@ class GaussianDiffusion:
                 (1.0 - self.alphas_cumprod_prev) * np.sqrt(alphas) / (1.0 - self.alphas_cumprod)
         )
 
+        # # #
+        self.one_chu_sqrt_alpha = 1.0 / np.sqrt(alphas)
+        self.betas_chu_sqrt_one_mins_alpha_cumprod = self.betas / np.sqrt(1.0 - self.alphas_cumprod)
 
     # def q_mean_variance
     #                   Get the distribution q(x_t | x_0).
@@ -401,6 +404,7 @@ class GaussianDiffusion:
             "variance": model_variance,
             "log_variance": model_log_variance,
             "pred_xstart": pred_xstart,
+            "model_output": model_output  # # #
         }
 
     # def condition_mean(self, cond_fn, p_mean_var, x, t, model_kwargs=None):
@@ -669,7 +673,16 @@ class GaussianDiffusion:
         #     )
 
         noise = th.randn_like(x)
-        sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
+
+        if conf.is_ddpm_paper_get_xprev:
+            sample = (_extract_into_tensor(self.one_chu_sqrt_alpha, t, x.shape)
+                      * (
+                              x - out["model_output"] * _extract_into_tensor(self.betas_chu_sqrt_one_mins_alpha_cumprod,
+                                                                             t, x.shape)
+                      )
+                      ) + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
+        else:
+            sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
 
         # sample = out["mean"] # ddpm不引入随机噪声时
 

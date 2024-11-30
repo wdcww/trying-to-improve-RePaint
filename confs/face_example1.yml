@@ -49,7 +49,11 @@ show_progress: true # # tqdm
 
 # # # # gaussian_diffusion.py/ p_mean_variance()
 learn_sigma: true # # # # # # # # relate with model_var_type
+
+# # # one true,another false
+is_ddpm_paper_get_xprev: true # # # # # # # # #
 predict_xstart: false # # # # # # # # relate with model_mean_type
+# # # # #
 
 
 
