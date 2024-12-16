@@ -23,18 +23,17 @@ data:
 #        gts: ./log/gt
 #        gt_keep_masks: ./log/gt_keep_mask
 
-
-
-inpa_inj_sched_prev: true # # # # unmasked + masked
+show_progress: true
 
 
 # # unet pre-trained
 model_path: ./data/pretrained/celeba256_250000.pt
+#model_path: ./data/pretrained/256x256_diffusion_uncond.pt
 
 
 # # # # gaussian_diffusion.py/ get_named_beta_schedule()
-diffusion_steps: 1000 #
-noise_schedule: linear #
+diffusion_steps: 1000
+noise_schedule: linear
 
 timestep_respacing: '50' # respace.py
 schedule_jump_params:
@@ -43,17 +42,31 @@ schedule_jump_params:
   jump_n_sample: 10
 
 
-use_ddim: false # # # # # # # # # # # # # # #
-eta: 0.0 # # # ddim eta # # #
-show_progress: true # # tqdm
+# # inpainting # #
+inpa_inj_sched_prev: true # # # # unmasked + masked
+
+# # # 2024.11.6 # # #
+use_ddim: false # ddim
+eta: 0.0 # ddim eta
+# # #
 
 # # # # gaussian_diffusion.py/ p_mean_variance()
 learn_sigma: true # # # # # # # # relate with model_var_type
 
-# # # one true,another false
-is_ddpm_paper_get_xprev: true # # # # # # # # #
-predict_xstart: false # # # # # # # # relate with model_mean_type
-# # # # #
+# # # # # #
+is_ddpm_paper_get_xprev: false # # # 2024.11.30 # # #
+predict_xstart: false # # # # # # relate with model_mean_type
+# # # # # #
+
+
+# # 2024.12.7 # #
+use_ref_imgs: true
+down_N: 32
+range_t: 0
+# # # # # #
+
+
+
 
 
 
@@ -61,11 +74,9 @@ predict_xstart: false # # # # # # # # relate with model_mean_type
 use_kl: false # relate with loss_type
 rescale_learned_sigmas: false # relate with loss_type
 
-
 rescale_timesteps: false # if True,then NotImplementedError. respace.py/class _WrappedModel
 
 clip_denoised: true # gaussian_diffusion.py/process_xstart()
-
 
 # # # # script_util.py/ model_and_diffusion_defaults()
 image_size: 256 # # also test.py/ sample_fn

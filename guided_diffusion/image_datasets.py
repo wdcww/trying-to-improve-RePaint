@@ -79,6 +79,13 @@ def load_data_inpa(
     if len(mask_paths) == 1 and len(gt_paths) > 1:
         mask_paths = [mask_paths[0]] * len(gt_paths)
 
+    # 如果 mask_paths 少于 gt_paths，则根据 mask_paths 数量裁剪 gt_paths
+    if len(mask_paths) < len(gt_paths):
+        gt_paths = gt_paths[:len(mask_paths)]
+    # # 如果 mask_paths 少于 gt_paths，则随机选择与 mask_paths 数量相同的 gt_paths
+    # if len(mask_paths) < len(gt_paths):
+    #     gt_paths = random.sample(gt_paths, len(mask_paths))
+
     assert len(gt_paths) == len(mask_paths)
 
     classes = None

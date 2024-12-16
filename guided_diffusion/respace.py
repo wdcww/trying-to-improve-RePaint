@@ -112,9 +112,9 @@ class SpacedDiffusion(GaussianDiffusion):
                     new_betas.append(1 - alpha_cumprod / last_alpha_cumprod)
                     last_alpha_cumprod = alpha_cumprod
                     self.timestep_map.append(i)
-            print("respace.py--self.timestep_map( 此list可追溯至respace.py的space_timesteps()函数 )   ",self.timestep_map)
-            print("self.timestep_map的长度  ",len(self.timestep_map) )
-            print("respace.py--( 长度 ) : new_betas   (", len(new_betas),") : ",new_betas)
+            # print("respace.py--self.timestep_map( 此list可追溯至respace.py的space_timesteps()函数 )   ",self.timestep_map)
+            # print("self.timestep_map的长度  ",len(self.timestep_map) )
+            # print("respace.py--( 长度 ) : new_betas   (", len(new_betas),") : ",new_betas)
             kwargs["betas"] = np.array(new_betas)
 
         # if conf.use_value_logger:

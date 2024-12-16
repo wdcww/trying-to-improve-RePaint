@@ -60,64 +60,64 @@ def _check_times_1(times, t_0, t_T):
 # # #############################################################################
 
 
-# ####### 禁用Resampling版本：
-# def get_schedule_jump(t_T,
-#                       jump_length=10, jump_n_sample=10,
-#                            ):
-#     """
-#     返回值是一个递减的列表 ts，仅需要：
-#     t_T : 总步数
-#     """
-#     t = t_T
-#     ts = []
-#     while t >= 1:  # while循环中,t从t_T开始递减到1,表示总的时间步数
-#         t = t - 1
-#         ts.append(t)
-#     ts.append(-1)
-#     _check_times(ts, -1, t_T)
-#     return ts
+####### 禁用Resampling版本：
+def get_schedule_jump(t_T,
+                      jump_length=10, jump_n_sample=10,
+                           ):
+    """
+    返回值是一个递减的列表 ts，仅需要：
+    t_T : 总步数
+    """
+    t = t_T
+    ts = []
+    while t >= 1:  # while循环中,t从t_T开始递减到1,表示总的时间步数
+        t = t - 1
+        ts.append(t)
+    ts.append(-1)
+    _check_times(ts, -1, t_T)
+    return ts
 
 
 # # #############################################################################
 
 
-# ###### Resampling版本：
-def get_schedule_jump(t_T,
-                      jump_length,
-                      jump_n_sample):
-    """
-    t_T : 总步数
-
-    jump_length : 在所有的t_T步里，是jump_length的倍数的点算一个‘特殊点’，但最接近t_T那个倍数值点不算'特殊点'
-                  在'特殊点'处，就是处于Resample状态，每进入Resample状态，需要给当前的t加jump_length个点。
-
-    jump_n_sample ：对于某个我们能取到的'特殊点'，该点一共会经历 jump_n_sample-1 次Resample状态
-    """
-    # 初始化一个空字典jumps
-    jumps = {}
-    # 使用for循环遍历从0开始，到小于t_T - jump_length为止，步长为jump_length的整数序列
-    for j in range(0, t_T - jump_length, jump_length):
-        # 对于序列中的每个j，字典jumps的键j的值都是下面的 jump_n_sample - 1
-        jumps[j] = jump_n_sample - 1
-
-    t = t_T
-    ts = []
-
-    while t >= 1:  # while循环中,t从t_T开始递减到1,表示总的时间步数
-        t = t - 1
-        ts.append(t)
-
-        if jumps.get(t, 0) > 0 :
-            jumps[t] = jumps[t] - 1
-            for _ in range(jump_length):
-                t = t + 1
-                ts.append(t)
-
-    ts.append(-1)
-
-    _check_times(ts, -1, t_T)
-    # print("scheduler.py的ts:  ",ts)
-    return ts
+# # ###### Resampling版本：
+# def get_schedule_jump(t_T,
+#                       jump_length,
+#                       jump_n_sample):
+#     """
+#     t_T : 总步数
+#
+#     jump_length : 在所有的t_T步里，是jump_length的倍数的点算一个‘特殊点’，但最接近t_T那个倍数值点不算'特殊点'
+#                   在'特殊点'处，就是处于Resample状态，每进入Resample状态，需要给当前的t加jump_length个点。
+#
+#     jump_n_sample ：对于某个我们能取到的'特殊点'，该点一共会经历 jump_n_sample-1 次Resample状态
+#     """
+#     # 初始化一个空字典jumps
+#     jumps = {}
+#     # 使用for循环遍历从0开始，到小于t_T - jump_length为止，步长为jump_length的整数序列
+#     for j in range(0, t_T - jump_length, jump_length):
+#         # 对于序列中的每个j，字典jumps的键j的值都是下面的 jump_n_sample - 1
+#         jumps[j] = jump_n_sample - 1
+#
+#     t = t_T
+#     ts = []
+#
+#     while t >= 1:  # while循环中,t从t_T开始递减到1,表示总的时间步数
+#         t = t - 1
+#         ts.append(t)
+#
+#         if jumps.get(t, 0) > 0 :
+#             jumps[t] = jumps[t] - 1
+#             for _ in range(jump_length):
+#                 t = t + 1
+#                 ts.append(t)
+#
+#     ts.append(-1)
+#
+#     _check_times(ts, -1, t_T)
+#     # print("scheduler.py的ts:  ",ts)
+#     return ts
 
 # # #############################################################################
 

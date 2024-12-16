@@ -62,6 +62,20 @@ def toU8(sample):
     sample = sample.detach().cpu().numpy()
     return sample
 
+# def load_custom_image(image_path, image_size, batch_size):
+#     """
+#     加载一张图片做ref_img
+#     """
+#     transform = transforms.Compose([
+#         transforms.Resize((image_size, image_size)),
+#         transforms.ToTensor(),
+#         transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),  # 转换为 [-1, 1]
+#     ])
+#     img = Image.open(image_path).convert("RGB")
+#     img_tensor = transform(img).unsqueeze(0)  # 增加 batch 维度
+#     img_tensor = img_tensor.repeat(batch_size, 1, 1, 1)  # 扩展到 batch_size
+#     return img_tensor
+
 
 def main(conf: conf_mgt.Default_Conf):
 
@@ -82,64 +96,16 @@ def main(conf: conf_mgt.Default_Conf):
         dist_util.load_state_dict(os.path.expanduser(
             conf.model_path), map_location="cpu")  # checkpoint地址conf.model_path
     )
-    # print(model)
 
     model.to(device)
 
-    # if conf.use_fp16: # face_example.yml中，这里是false
-    #     model.convert_to_fp16()
 
     model.eval() # repaint只是推理
 
     show_progress = conf.show_progress
-
-    # print('test.py conf.classifier_path: ',end='')
-    # print(conf.classifier_path)
-    cond_fn = None # 这里cond_fn直接是下面这个if-else的else的结果
-    # if conf.classifier_scale > 0 and conf.classifier_path:
-    #     print("loading classifier...")
-    #     classifier = create_classifier(
-    #         **select_args(conf, classifier_defaults().keys()))
-    #     classifier.load_state_dict(
-    #         dist_util.load_state_dict(os.path.expanduser(
-    #             conf.classifier_path), map_location="cpu")
-    #     )
-    #
-    #     classifier.to(device)
-    #     if conf.classifier_use_fp16:
-    #         classifier.convert_to_fp16()
-    #     classifier.eval()
-    #
-    #     def cond_fn(x, t, y=None, gt=None, **kwargs):
-    #         assert y is not None
-    #         with th.enable_grad():
-    #             x_in = x.detach().requires_grad_(True)
-    #             logits = classifier(x_in, t)
-    #             log_probs = F.log_softmax(logits, dim=-1)
-    #             selected = log_probs[range(len(logits)), y.view(-1)]
-    #             return th.autograd.grad(selected.sum(), x_in)[0] * conf.classifier_scale
-    # else:
-    #     cond_fn = None
-
-    # def model_fn(x, t, y=None, gt=None, **kwargs):
-    #     """
-    #     这个函数允许在条件生成任务中根据需求进行不同的设置，
-    #     比如是否使用类别信息来指导生成过程。
-    #
-    #     根据 conf.class_cond的值来决定是否将 y 参数传递给 model 函数
-    #     conf.class_cond 为 True，则传递 y
-    #     如果conf.class_cond为 False，则传递 None
-    #     x：输入张量，通常是模型的输入数据（如噪声或先前生成的图像）。
-    #     t：时间步长，通常用于扩散模型中的时间编码。
-    #     y：类别标签或条件信息（如果有的话）。
-    #     gt：真实图像（如果有的话），通常用于条件生成任务中的损失计算。
-    #     **kwargs：其他额外的关键字参数
-    #     """
-    #     # assert y is not None
-    #     return model(x, t, y if conf.class_cond else None, gt=gt)
+    cond_fn = None
 
     print("sampling...")
-    # all_images = [] # 没有用到,就先注释掉
 
     dset = 'eval'
     eval_name = conf.get_default_eval_name() # # 获取.yml里的 data字典中的 eval字典中的 键的名字
@@ -163,18 +129,20 @@ def main(conf: conf_mgt.Default_Conf):
             model_kwargs['gt_keep_mask'] = gt_keep_mask # mask二值图的相关kwargs
 
         batch_size = model_kwargs["gt"].shape[0]
-        # print("test.py --batch_size : ",batch_size)
 
-        # if conf.cond_y is not None: # conf.cond_y是None
-        #     classes = th.ones(batch_size, dtype=th.long, device=device)
-        #     model_kwargs["y"] = classes * conf.cond_y # 使用固定的类标签
-        # else:
-        #     pass
-        #     # classes = th.randint(
-        #     #     low=0, high=NUM_CLASSES, size=(batch_size,), device=device
-        #     # ) # 一个大小为batch_size随机整数张量classes,值的范围在0到NUM_CLASSES之间
-        #     # model_kwargs["y"] = classes # 使用随机生成的类标签
-
+        if conf.use_ref_imgs:
+            # ref_img = load_custom_image(r"00003.png", image_size=256, batch_size=batch_size)
+            # model_kwargs["ref_img"] = ref_img.to(device)
+            model_kwargs["ref_img"] = model_kwargs["gt"] # 参考图片就弄成真实图片
+            from resizer import Resizer
+            shape = (batch_size, 3, conf.image_size, conf.image_size)
+            shape_d = (batch_size, 3, int(conf.image_size / conf.down_N), int(conf.image_size / conf.down_N))
+            # print(f"shape: {shape}, shape_d: {shape_d}")
+            down = Resizer(shape, 1 / conf.down_N).to(next(model.parameters()).device)
+            up = Resizer(shape_d, conf.down_N).to(next(model.parameters()).device)
+            resizers = (down, up)
+        else:
+            resizers = None
 
         if not conf.use_ddim:
             print("test.py--- ddpm --")
@@ -186,19 +154,6 @@ def main(conf: conf_mgt.Default_Conf):
         )
 
         def model_fn(x, t, y=None, gt=None, **kwargs):
-            """
-            这个函数允许在条件生成任务中根据需求进行不同的设置，
-            比如是否使用类别信息来指导生成过程。
-
-            根据 conf.class_cond的值来决定是否将 y 参数传递给 model 函数
-            conf.class_cond 为 True，则传递 y
-            如果conf.class_cond为 False，则传递 None
-            x：输入张量，通常是模型的输入数据（如噪声或先前生成的图像）。
-            t：时间步长，通常用于扩散模型中的时间编码。
-            y：类别标签或条件信息（如果有的话）。
-            gt：真实图像（如果有的话），通常用于条件生成任务中的损失计算。
-            **kwargs：其他额外的关键字参数
-            """
             # assert y is not None
             # print(y) # y目前就是none
             return model(x, t, y if conf.class_cond else None, gt=gt)
@@ -212,14 +167,15 @@ def main(conf: conf_mgt.Default_Conf):
             device=device,
             progress=show_progress,
             return_all=True,
+            resizers=resizers,
             conf=conf
         )
 
         srs = toU8(result['sample']) # srs是inpainted
         lrs = toU8(result.get('gt') * model_kwargs.get('gt_keep_mask') +
                    (-1) * th.ones_like(result.get('gt')) * (1 - model_kwargs.get('gt_keep_mask'))) #lrs是gt_masked
-        # gts = toU8(result['gt'])     # gts是gt
-        # gt_keep_masks = toU8((model_kwargs.get('gt_keep_mask') * 2 - 1)) #gt_keep_masks是gt_keep_mask
+        gts = toU8(result['gt'])     # gts是gt
+        gt_keep_masks = toU8((model_kwargs.get('gt_keep_mask') * 2 - 1)) #gt_keep_masks是gt_keep_mask
 
         # conf.eval_imswrite(
         #     srs=srs, gts=gts, lrs=lrs, gt_keep_masks=gt_keep_masks,
@@ -235,18 +191,6 @@ def main(conf: conf_mgt.Default_Conf):
             srs=srs, lrs=lrs,img_names=batch['GT_name'], dset=dset, name=eval_name, verify_same=False)
 
     print("sampling complete")
-
-
-
-
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument('--conf_path', type=str, required=False, default=None)
-#     args = vars(parser.parse_args())
-#
-#     conf_arg = conf_mgt.conf_base.Default_Conf()
-#     conf_arg.update(yamlread(args.get('conf_path')))
-#     main(conf_arg)
 
 
 if __name__ == "__main__":

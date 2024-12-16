@@ -9,5 +9,6 @@ I refer to the code in repository [RePaint](https://github.com/andreas128/RePain
 commit 1 : 重新添加了ddim采样
 commit 2 : 把scheduler.py好好整理了一下, 同时.yml中schedule_jump_params不再需要n_sample
 commit 3 : ddpm的p_sample()添加了"预测噪声"版本的采样,详情见 issue 1 
+commit 4 : 为方便阅读删去了之前注释掉的代码；从《ILVR》搞过来一点东西,详情见 issue 2；
 
 ```

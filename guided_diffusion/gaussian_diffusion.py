@@ -234,8 +234,18 @@ class GaussianDiffusion:
     # def q_mean_variance
     #                   Get the distribution q(x_t | x_0).
 
-    # def q_sample
-    #                   sample from distribution q(x_t | x_0).
+    def q_sample(self, x_start, t, noise=None):
+        """
+        sample from distribution q(x_t | x_0).
+        """
+        if noise is None:
+            noise = th.randn_like(x_start)
+        assert noise.shape == x_start.shape
+        return (
+                _extract_into_tensor(self.sqrt_alphas_cumprod, t, x_start.shape) * x_start
+                + _extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t, x_start.shape)
+                * noise
+        )
 
     def q_posterior_mean_variance(self, x_start, x_t, t):
         """
@@ -451,6 +461,7 @@ class GaussianDiffusion:
             device=None,
             progress=True,
             return_all=False,
+            resizers=None,
             conf=None
     ):
         """
@@ -491,6 +502,7 @@ class GaussianDiffusion:
                 model_kwargs=model_kwargs,
                 device=device,
                 progress=progress,
+                resizers=resizers,
                 conf=conf
         ):
             final = sample
@@ -511,6 +523,7 @@ class GaussianDiffusion:
             model_kwargs=None,
             device=None,
             progress=False,
+            resizers=None,
             conf=None
     ):
         """
@@ -571,6 +584,7 @@ class GaussianDiffusion:
                             cond_fn=cond_fn,
                             model_kwargs=model_kwargs,
                             conf=conf,
+                            resizers=resizers,
                             pred_xstart=pred_xstart
                         )
                         image_after_step = out["sample"]  # 更新状态图
@@ -600,6 +614,7 @@ class GaussianDiffusion:
             denoised_fn=None,
             cond_fn=None,
             model_kwargs=None,
+            resizers=None,
             conf=None, meas_fn=None, pred_xstart=None, idx_wall=-1
     ):
         """
@@ -633,23 +648,18 @@ class GaussianDiffusion:
 
             if pred_xstart is not None: # 第一次是none,跳过了。
                 gt_keep_mask = model_kwargs.get('gt_keep_mask')
-                if gt_keep_mask is None:
-                    gt_keep_mask = conf.get_inpa_mask(x)
 
                 gt = model_kwargs['gt']
 
                 alpha_cumprod = _extract_into_tensor(self.alphas_cumprod, t, x.shape)
 
-                if conf.inpa_inj_sched_prev_cumnoise:
-                    pass # weighed_gt = self.get_gt_noised(gt, int(t[0].item()))
-                else:
-                    gt_weight = th.sqrt(alpha_cumprod)
-                    gt_part = gt_weight * gt
+                gt_weight = th.sqrt(alpha_cumprod)
+                gt_part = gt_weight * gt
 
-                    noise_weight = th.sqrt((1 - alpha_cumprod))
-                    noise_part = noise_weight * th.randn_like(x)
+                noise_weight = th.sqrt((1 - alpha_cumprod))
+                noise_part = noise_weight * th.randn_like(x)
 
-                    weighed_gt = gt_part + noise_part
+                weighed_gt = gt_part + noise_part
                 # x_ = x # ##########################################################
                 x = (gt_keep_mask * (weighed_gt) + (1 - gt_keep_mask) * (x))
                 # print(x==x_) # #######################################################
@@ -684,7 +694,23 @@ class GaussianDiffusion:
         else:
             sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
 
-        # sample = out["mean"] # ddpm不引入随机噪声时
+
+        if conf.use_ref_imgs: # 如果使用我缝合的使用参考图像引导
+            if resizers is not None:
+                down, up = resizers
+
+            # ## ILVR ####
+            if resizers is not None:
+                if t.item() > conf.range_t:
+                    sample = ( sample +
+                    up(
+                        down(
+                            self.q_sample( model_kwargs["ref_img"], t )
+                        )
+                    ) - up(
+                        down( sample )
+                    )
+                                     )
 
         result = {"sample": sample,
                   "pred_xstart": out["pred_xstart"],
