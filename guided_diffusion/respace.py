@@ -126,7 +126,7 @@ class SpacedDiffusion(GaussianDiffusion):
     def p_mean_variance(
         self, model, *args, **kwargs
     ):  # pylint: disable=signature-differs
-        return super().p_mean_variance(self._wrap_model(model), *args, **kwargs)
+        return super().p_mean_variance(self._wrap_model(model),*args, **kwargs)
         # return super().p_mean_variance(self.model, *args, **kwargs)
 
     def _wrap_model(self, model):

@@ -21,6 +21,8 @@ process towards more realistic images.
 
 import os
 import argparse
+
+import torch
 import torch as th
 import torch.nn.functional as F
 import time
@@ -39,6 +41,7 @@ from guided_diffusion import dist_util
 # except:
 #     pass
 
+from torchvision.transforms import ToPILImage
 
 from guided_diffusion.script_util import (
     # NUM_CLASSES,
@@ -62,19 +65,17 @@ def toU8(sample):
     sample = sample.detach().cpu().numpy()
     return sample
 
-# def load_custom_image(image_path, image_size, batch_size):
-#     """
-#     加载一张图片做ref_img
-#     """
-#     transform = transforms.Compose([
-#         transforms.Resize((image_size, image_size)),
-#         transforms.ToTensor(),
-#         transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),  # 转换为 [-1, 1]
-#     ])
-#     img = Image.open(image_path).convert("RGB")
-#     img_tensor = transform(img).unsqueeze(0)  # 增加 batch 维度
-#     img_tensor = img_tensor.repeat(batch_size, 1, 1, 1)  # 扩展到 batch_size
-#     return img_tensor
+def save_image(tensor_img, path):
+    """
+    tensor_img : [3, H, W]
+    """
+    tensor_img = tensor_img.clamp(min=0.0, max=1.0)
+    pil = ToPILImage()(tensor_img)
+    pil.save(path)
+
+def normalize_image(tensor_img):
+    tensor_img = (tensor_img + 1.0) / 2.0
+    return tensor_img
 
 
 def main(conf: conf_mgt.Default_Conf):
@@ -114,6 +115,9 @@ def main(conf: conf_mgt.Default_Conf):
     dl = conf.get_dataloader(dset=dset, dsName=eval_name)
     # ###### dataloader ######################################### #
 
+    sample_path = conf.sample_path
+    os.makedirs(sample_path, exist_ok=True)
+
     for batch in iter(dl):
 
         for k in batch.keys():
@@ -130,19 +134,6 @@ def main(conf: conf_mgt.Default_Conf):
 
         batch_size = model_kwargs["gt"].shape[0]
 
-        if conf.use_ref_imgs:
-            # ref_img = load_custom_image(r"00003.png", image_size=256, batch_size=batch_size)
-            # model_kwargs["ref_img"] = ref_img.to(device)
-            model_kwargs["ref_img"] = model_kwargs["gt"] # 参考图片就弄成真实图片
-            from resizer import Resizer
-            shape = (batch_size, 3, conf.image_size, conf.image_size)
-            shape_d = (batch_size, 3, int(conf.image_size / conf.down_N), int(conf.image_size / conf.down_N))
-            # print(f"shape: {shape}, shape_d: {shape_d}")
-            down = Resizer(shape, 1 / conf.down_N).to(next(model.parameters()).device)
-            up = Resizer(shape_d, conf.down_N).to(next(model.parameters()).device)
-            resizers = (down, up)
-        else:
-            resizers = None
 
         if not conf.use_ddim:
             print("test.py--- ddpm --")
@@ -158,38 +149,49 @@ def main(conf: conf_mgt.Default_Conf):
             # print(y) # y目前就是none
             return model(x, t, y if conf.class_cond else None, gt=gt)
 
-        result = sample_fn(
-            model_fn, # 上面不远有个函数就叫model_fn
-            (batch_size, 3, conf.image_size, conf.image_size), # 传递给 shape 参数的元组
-            clip_denoised=conf.clip_denoised,
-            model_kwargs=model_kwargs,
-            cond_fn=cond_fn,
-            device=device,
-            progress=show_progress,
-            return_all=True,
-            resizers=resizers,
-            conf=conf
-        )
+        base_count = len(os.listdir(sample_path))  # 含义：当前sample_path目录下已有的图像样本数量。
+        samples = []
 
-        srs = toU8(result['sample']) # srs是inpainted
-        lrs = toU8(result.get('gt') * model_kwargs.get('gt_keep_mask') +
-                   (-1) * th.ones_like(result.get('gt')) * (1 - model_kwargs.get('gt_keep_mask'))) #lrs是gt_masked
-        gts = toU8(result['gt'])     # gts是gt
-        gt_keep_masks = toU8((model_kwargs.get('gt_keep_mask') * 2 - 1)) #gt_keep_masks是gt_keep_mask
+        # ___________________________________________
+        for n in range(conf.n_iter):
+            result = sample_fn(
+                model_fn,
+                (batch_size, 3, conf.image_size, conf.image_size),  # 传递给 shape 参数的元组
+                clip_denoised=conf.clip_denoised,
+                model_kwargs=model_kwargs,
+                cond_fn=cond_fn,
+                device=device,
+                progress=show_progress,
+                return_all=True,
+                conf=conf
+            )
 
-        # conf.eval_imswrite(
-        #     srs=srs, gts=gts, lrs=lrs, gt_keep_masks=gt_keep_masks,
-        #     img_names=batch['GT_name'], dset=dset, name=eval_name, verify_same=False)
+            inpainted = normalize_image(result["sample"])
+            samples.append(inpainted.detach().cpu())
+        # ___________________________________________
 
-        # # # gt_keep_masks()就先不看了
-        # conf.eval_imswrite(
-        #     srs=srs, gts=gts, lrs=lrs,
-        #     img_names=batch['GT_name'], dset=dset, name=eval_name, verify_same=False)
+        samples = torch.cat(samples)
+        # save generations
+        for sample in samples:
+            save_image(sample, os.path.join(sample_path, f"{base_count:05}.png"))
+            base_count += 1
 
-        # gt和gt_keep_masks就先不看了
+        # srs = toU8(result['sample']) # srs是inpainted
+        lrs = toU8(result.get('gt') * model_kwargs.get('gt_keep_mask') + (-1) * th.ones_like(result.get('gt')) * (
+                    1 - model_kwargs.get('gt_keep_mask')))  # lrs是gt_masked
+        gts = toU8(result['gt'])  # gts是gt
+        gt_keep_masks = toU8((model_kwargs.get('gt_keep_mask') * 1 - 1))  # gt_keep_masks是gt_keep_mask
+
         conf.eval_imswrite(
-            srs=srs, lrs=lrs,img_names=batch['GT_name'], dset=dset, name=eval_name, verify_same=False)
+            lrs=lrs,
+            gts=gts,
+            gt_keep_masks=gt_keep_masks,
+            img_names=batch['GT_name'], dset=dset, name=eval_name, verify_same=False)
 
+        # # # 全的
+        # conf.eval_imswrite(
+        #     srs=srs, gts=gts, lrs=lrs,gt_keep_masks=gt_keep_masks,
+        #     img_names=batch['GT_name'], dset=dset, name=eval_name, verify_same=False)
     print("sampling complete")
 
 

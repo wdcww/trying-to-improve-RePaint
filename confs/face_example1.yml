@@ -4,8 +4,9 @@ data:
     paper_face_mask:  #conf_base.py/ dsName
       mask_loader: true
       # # The following is consistent with image_datasets.py/ load_data_inpa()
-      gt_path: ./data/datasets/mypic
-      mask_path: ./data/datasets/mymask
+      gt_path: ./mydata/gt
+      mask_path: ./mydata/mask
+#      texture_map: ./ref_edge # # # edge_connect
       batch_size: 1
       image_size: 256 # Resized image(your desired)
 #      class_cond: false
@@ -14,33 +15,37 @@ data:
       random_flip: false
       return_dataloader: true
       return_dict: true
-      max_len: 1 # # image_dataset.py/ __len__()
+      max_len: 3 # # image_dataset.py/ __len__()
       drop_last: false
       offset: 0
       paths: # # # # # # # # # # # # # #
-        srs: ./log/inpainted
-        lrs: ./log/gt_masked
-#        gts: ./log/gt
-#        gt_keep_masks: ./log/gt_keep_mask
+#        srs: ./myout/test/inpainted
+        lrs: ./myout/test/gt_masked
+        gts: ./myout/test/gt
+        gt_keep_masks: ./myout/test/gt_keep_mask
+
+# Each mask image generates n_iter images
+n_iter: 2
+sample_path: ./myout/test/inpainted
+
 
 show_progress: true
 
 
 # # unet pre-trained
 model_path: ./data/pretrained/celeba256_250000.pt
+#model_path: data/pretrained/places256_300000.pt
 #model_path: ./data/pretrained/256x256_diffusion_uncond.pt
-
 
 # # # # gaussian_diffusion.py/ get_named_beta_schedule()
 diffusion_steps: 1000
 noise_schedule: linear
 
-timestep_respacing: '50' # respace.py
+timestep_respacing: '250' # respace.py
 schedule_jump_params:
-  t_T: 50 # # # # scheduler.py # # # #
+  t_T: 250 # scheduler.py
   jump_length: 10
-  jump_n_sample: 10
-
+  jump_n_sample: 2 # more than 2
 
 # # inpainting # #
 inpa_inj_sched_prev: true # # # # unmasked + masked
@@ -53,21 +58,20 @@ eta: 0.0 # ddim eta
 # # # # gaussian_diffusion.py/ p_mean_variance()
 learn_sigma: true # # # # # # # # relate with model_var_type
 
-# # # # # #
-is_ddpm_paper_get_xprev: false # # # 2024.11.30 # # #
+# # # 2024.11.30 # # #
+is_ddpm_paper_get_xprev: false
 predict_xstart: false # # # # # # relate with model_mean_type
-# # # # # #
+# # # # # # # # #
 
 
-# # 2024.12.7 # #
-use_ref_imgs: true
-down_N: 32
-range_t: 0
-# # # # # #
+## # 2024.12.7 # #
+#use_ref_imgs: false
+#down_N: 32
+#range_t: 0
+## # # # # #
 
-
-
-
+# # 2024.12.17 # && # 2024.12.27 # #
+#use_ref_texture: false # # use edge_connect's output # #
 
 
 # # # # script_util.py/ create_gaussian_diffusion()
@@ -116,5 +120,4 @@ use_new_attention_order: false
 
 #print_estimated_vars: true
 #inpa_inj_sched_prev_cumnoise: false
-
 

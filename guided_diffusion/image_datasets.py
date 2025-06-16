@@ -72,21 +72,33 @@ def load_data_inpa(
     gt_dir = os.path.expanduser(gt_path)
     mask_dir = os.path.expanduser(mask_path)
 
+
     gt_paths = _list_image_files_recursively(gt_dir)
     mask_paths = _list_image_files_recursively(mask_dir)
+
 
     # 如果只有一张mask图，重复使用
     if len(mask_paths) == 1 and len(gt_paths) > 1:
         mask_paths = [mask_paths[0]] * len(gt_paths)
 
-    # 如果 mask_paths 少于 gt_paths，则根据 mask_paths 数量裁剪 gt_paths
     if len(mask_paths) < len(gt_paths):
+        # 如果 mask_paths 少于 gt_paths，则根据 mask_paths 数量裁剪 gt_paths
         gt_paths = gt_paths[:len(mask_paths)]
+    elif len(gt_paths) < len(mask_paths):
+        # 如果 gt_paths 少于 mask_paths
+        mask_paths = mask_paths[:len(gt_paths)]
+
     # # 如果 mask_paths 少于 gt_paths，则随机选择与 mask_paths 数量相同的 gt_paths
     # if len(mask_paths) < len(gt_paths):
     #     gt_paths = random.sample(gt_paths, len(mask_paths))
 
+
+
+
+
+
     assert len(gt_paths) == len(mask_paths)
+
 
     classes = None
     if class_cond:
