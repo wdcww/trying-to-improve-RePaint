@@ -9,7 +9,7 @@ data:
 #      texture_map: ./ref_edge # # # edge_connect
       batch_size: 1
       image_size: 256 # Resized image(your desired)
-#      class_cond: false
+      class_cond: false
       deterministic: true # The opposite of shuffle in Dataloader
       random_crop: false # if true,NotImplementedError()
       random_flip: false
